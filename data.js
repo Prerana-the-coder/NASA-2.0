@@ -127,6 +127,11 @@ const PARAMS = [
     interp: { earth: 'Daily mean surface incident solar flux.', mars: 'Surface attenuated solar flux.', moon: 'Unfiltered solar flux (shadowed at polar bottoms).' } }
 ];
 
+if (typeof globalThis !== 'undefined') {
+  globalThis.PARAMS = PARAMS;
+  globalThis.CAT_LABEL = CAT_LABEL;
+}
+
 const PARAM = Object.fromEntries(PARAMS.map(p => [p.id, p]));
 const ORDER = PARAMS.map(p => p.id);
 

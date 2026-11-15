@@ -6,7 +6,7 @@
 <title>NASA — Planetary Analog Intelligence</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%230a1428'/><text x='16' y='22' text-anchor='middle' fill='%2338d8ff' font-size='16' font-family='Arial'>☉</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261114">
+<link rel="stylesheet" href="style.css?v=20261115-assessment">
 </head>
 <body>
 
@@ -277,10 +277,12 @@
             <button class="fp-tab" data-fp="environment">Environment</button>
           </div>
 
-          <!-- Progress Bar Metrics Stack (Exactly as in Reference Mock) -->
+          <!-- Selected Location Fingerprint Metrics -->
           <div class="fp-content" id="fpContent">
-            <!-- Populated dynamically with icons, labels, progress fills, and percentages -->
+            <!-- Populated with location values, normalized range bars, and evidence grades -->
           </div>
+
+          <section class="site-context" id="siteContext" aria-live="polite"></section>
 
           <!-- Informational Synthesis Footnote -->
           <div class="region-info-note" id="regionNote">
@@ -492,7 +494,7 @@
         <span class="badge-tag">NASA FIELD OPERATIONS</span>
         <h3>🛠️ Mission Hardware & Procedure Test Planner</h3>
       </div>
-      <p class="modal-sub">Select hardware testing objectives to evaluate candidate site operational viability.</p>
+      <p class="modal-sub">Generate a catalog-backed site suitability assessment and protocols for your selected hardware objectives.</p>
 
       <div class="planner-grid">
         <div class="planner-column">
@@ -511,8 +513,8 @@
           <button class="btn-primary btn-full" id="btnGeneratePlan" style="margin-top:16px">Generate Field Assessment</button>
         </div>
 
-        <div class="planner-column" id="plannerOutputArea">
-          <div class="empty-state">Select site and hardware objectives to generate testing protocols and logistical clearance.</div>
+        <div class="planner-column" id="plannerOutputArea" aria-live="polite">
+          <div class="empty-state">Choose a field site and objectives to generate an evidence-based assessment. Access, permits, and safety require local verification.</div>
         </div>
       </div>
     </div>
@@ -649,10 +651,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
 <!-- Engine & Platform Core -->
-<script src="data.js?v=20261114"></script>
+<script src="data.js?v=20261115"></script>
 <script src="engine.js?v=20261114"></script>
 <script src="graph.js?v=20261114"></script>
 <script src="globe.js?v=20261114"></script>
-<script src="app.js?v=20261114"></script>
+<script src="app.js?v=20261115-assessment"></script>
 </body>
 </html>

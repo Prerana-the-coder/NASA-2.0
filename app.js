@@ -319,6 +319,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Default to 'fingerprint' tab
     const activeFpTab = document.querySelector('.fp-tab.active');
     updateFingerprintBars(r, activeFpTab ? activeFpTab.dataset.fp : 'fingerprint');
+    document.getElementById('siteContext').innerHTML = renderSiteContext(r);
   }
 
   /* ============================================================
@@ -379,40 +380,92 @@ document.addEventListener('DOMContentLoaded', () => {
       const item = fp.find(f => f.p.id === id);
       if (!item) return;
 
-      let pct = 75; // fallback
-      if (bestMatch) {
-        const row = bestMatch.rows.find(rw => rw.p.id === id);
-        if (row && typeof row.s === 'number') {
-          pct = Math.round(row.s * 100);
-        } else if (item.z !== null) {
-          pct = Math.round(item.z * 100);
-        }
-      } else if (item.z !== null) {
-        pct = Math.round(item.z * 100);
+      const value = item.state === 'ok'
+        ? ENG.fmt(item.p, item.value) + (item.p.unit ? ' ' + item.p.unit : '')
+        : (item.state === 'na' ? 'N/A' : 'Unsampled');
+      let pct = 0;
+      if (item.state === 'ok' && item.p.type === 'num' && item.range) {
+        const transform = x => item.p.scale === 'log' ? Math.log10(x + (item.p.off || 0)) : x;
+        const min = transform(item.range[0]), max = transform(item.range[1]);
+        pct = max === min ? 50 : Math.round(ENG.clamp((transform(item.value) - min) / (max - min)) * 100);
       }
-
-      // Name mappings to match reference labels exactly
-      let displayName = item.p.name;
-      if (id === 'morph') displayName = 'Terrain Similarity';
-      if (id === 'geo')   displayName = 'Geology';
-      if (id === 'water') displayName = 'Water Indicators';
-
       const icon = METRIC_ICONS[id] || '•';
       const color = METRIC_COLORS[id] || '#38d8ff';
+      const interpretation = item.interp || item.p.name;
+      const source = item.src ? item.src.name : 'Curated synthesis';
 
       html += `
-        <div class="fp-bar-row">
-          <span class="fp-bar-icon">${icon}</span>
-          <span class="fp-bar-label">${displayName}</span>
-          <div class="fp-bar-wrap">
-            <div class="fp-bar-fill" style="width:${pct}%;background:${color}"></div>
+        <div class="fp-bar-row" title="${esc(interpretation)} Source: ${esc(source)}. Evidence grade ${esc(item.grade)}.">
+          <div class="fp-bar-meta">
+            <span class="fp-bar-icon">${icon}</span>
+            <span class="fp-bar-label">${esc(item.p.name)}</span>
+            <span class="fp-bar-value">${esc(value)}</span>
           </div>
-          <span class="fp-bar-value" style="color:${color}">${pct}%</span>
+          <div class="fp-bar-detail">
+            ${item.p.type === 'num' && item.state === 'ok'
+              ? `<div class="fp-bar-wrap" aria-label="${pct}% of the range for ${esc(BODIES[r.body].name)} sites"><div class="fp-bar-fill" style="width:${pct}%;background:${color}"></div></div>`
+              : `<span class="fp-category-note">${esc(interpretation)}</span>`}
+            <span class="fp-grade">Grade ${esc(item.grade)}</span>
+          </div>
         </div>
       `;
     });
 
     container.innerHTML = html;
+  }
+
+  function getSiteHistory(r) {
+    const missions = MISSIONS.filter(m => m.region === r.id);
+    const papers = (r.refs || []).map(id => PAPER[id]).filter(Boolean).sort((a, b) => a.yr - b.yr);
+    return {
+      pastMissions: missions.filter(m => m.end),
+      currentMissions: missions.filter(m => !m.end),
+      papers
+    };
+  }
+
+  function renderPaperCitation(p) {
+    return `<a href="${esc(paperLink(p))}" target="_blank" rel="noopener">${esc(p.title)}</a> — ${esc(p.au)}, ${esc(p.venue)}`;
+  }
+
+  function renderSiteContext(r) {
+    const history = getSiteHistory(r);
+    const historyItems = [
+      ...history.pastMissions.map(m => `<li><strong>${esc(m.name)}</strong> (${esc(m.start.slice(0, 4))}–${esc(m.end.slice(0, 4))}): ${esc(m.note)}</li>`),
+      ...history.papers.map(p => `<li><strong>${esc(p.yr)}:</strong> ${renderPaperCitation(p)}</li>`)
+    ];
+    const currentItems = history.currentMissions.map(m => `
+      <li><strong>${esc(m.name)}</strong> — ${esc(m.status)}. ${esc(m.note)}
+        <span class="site-context-meta">Instruments: ${esc(m.instruments.join(', '))}</span>
+      </li>
+    `);
+    const fp = ENG.fingerprint(r);
+    const presentMetrics = fp.map(item => {
+      const value = item.state === 'ok'
+        ? ENG.fmt(item.p, item.value) + (item.p.unit ? ' ' + item.p.unit : '')
+        : (item.state === 'na' ? 'N/A' : 'Unsampled');
+      const source = item.src ? item.src.name : 'Curated synthesis';
+      return `<span class="site-condition" title="${esc(source)}; evidence grade ${esc(item.grade)}"><strong>${esc(item.p.name)}:</strong> ${esc(value)} <small>Grade ${esc(item.grade)}</small></span>`;
+    }).join('');
+
+    return `
+      <h4 class="site-context-title">Past &amp; Present</h4>
+      <div class="site-era">
+        <h5>Past record</h5>
+        <p>${esc(r.desc || 'No historical site summary is available in this catalog.')}</p>
+        ${historyItems.length
+          ? `<ul>${historyItems.join('')}</ul>`
+          : '<p class="site-context-muted">No linked mission or research record is listed for this location.</p>'}
+      </div>
+      <div class="site-era">
+        <h5>Present profile <span>(catalog data, not live telemetry)</span></h5>
+        <div class="site-conditions">${presentMetrics}</div>
+        ${currentItems.length
+          ? `<ul>${currentItems.join('')}</ul>`
+          : '<p class="site-context-muted">No active mission is currently linked to this location in the catalog.</p>'}
+        <p class="site-context-muted">The dossier adds the full source list and exploration suitability analysis.</p>
+      </div>
+    `;
   }
 
   /* ============================================================
@@ -1155,6 +1208,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fp = ENG.fingerprint(r);
     const ex = ENG.exploration(r, currentWeights, { paperCount: rid => G ? GRAPH.paperCount(G, rid) : 0 });
+    const history = getSiteHistory(r);
 
     let html = `
       <div class="modal-header-with-badge">
@@ -1170,6 +1224,21 @@ document.addEventListener('DOMContentLoaded', () => {
         <span>&bull;</span>
         <span><strong>Country/Authority:</strong> ${r.country || 'International Space Agency Data'}</span>
       </div>
+
+      <h4 style="color:var(--text-bright);margin:16px 0 8px">Past &amp; Present Site Record</h4>
+      <p style="color:var(--text-muted);line-height:1.55">${esc(r.desc || 'No historical site summary is available in this catalog.')}</p>
+      ${history.pastMissions.length || history.papers.length ? `
+        <ul class="site-dossier-list">
+          ${history.pastMissions.map(m => `<li><strong>${esc(m.name)}</strong> (${esc(m.start.slice(0, 4))}–${esc(m.end.slice(0, 4))}): ${esc(m.note)}</li>`).join('')}
+          ${history.papers.map(p => `<li><strong>${esc(p.yr)}:</strong> ${renderPaperCitation(p)}</li>`).join('')}
+        </ul>
+      ` : '<p class="site-context-muted">No linked completed mission or research record is listed for this location.</p>'}
+      <h4 style="color:var(--text-bright);margin:16px 0 8px">Present Status</h4>
+      ${history.currentMissions.length ? `
+        <ul class="site-dossier-list">
+          ${history.currentMissions.map(m => `<li><strong>${esc(m.name)}</strong> — ${esc(m.status)}. ${esc(m.note)} Instruments: ${esc(m.instruments.join(', '))}.</li>`).join('')}
+        </ul>
+      ` : '<p class="site-context-muted">No active mission is currently linked to this location in the catalog. Current environmental measurements and their sources are listed below.</p>'}
 
       <h4 style="color:var(--text-bright);margin:16px 0 8px">Calibrated Scientific Parameters (15 Attributes):</h4>
       <table class="compare-table">
@@ -1233,11 +1302,21 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('plannerModal').style.display = 'none';
   });
 
+  let plannerReferenceId = null;
+
   function openMissionPlanner() {
     const sel = document.getElementById('plannerSiteSelect');
     const earthSites = REGIONS.filter(r => r.body === 'earth');
+    const reference = REG[selRegion];
+    plannerReferenceId = reference && reference.body !== 'earth' ? reference.id : null;
+    const bestAnalog = plannerReferenceId
+      ? ENG.rank(reference, earthSites, { weights: currentWeights })[0]
+      : null;
+    const defaultSiteId = reference && reference.body === 'earth'
+      ? reference.id
+      : (bestAnalog ? bestAnalog.B.id : earthSites[0].id);
     sel.innerHTML = earthSites.map(s => `
-      <option value="${s.id}" ${s.id === selRegion ? 'selected' : ''}>${s.name}</option>
+      <option value="${s.id}" ${s.id === defaultSiteId ? 'selected' : ''}>${esc(s.name)}</option>
     `).join('');
 
     document.getElementById('plannerModal').style.display = '';
@@ -1252,51 +1331,83 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!r) return;
 
     const checkedBoxes = Array.from(document.querySelectorAll('#hardwareChecklist input:checked')).map(cb => cb.value);
-
-    let planHtml = `
-      <h4 style="color:var(--accent-cyan);margin-bottom:8px">Field Testing Protocol: ${r.name}</h4>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px">
-        <strong>Seasonal Window:</strong> ${r.lat > 0 ? 'October to March (Dry Season)' : 'May to October'}<br>
-        <strong>Logistical Access:</strong> Paved road to field camp; satellite comms uplink required.<br>
-        <strong>Protected Area Status:</strong> Geological heritage zone; environmental permits required.
+    const metric = id => {
+      const p = PARAM[id], value = r.v[id];
+      if (value === X) return 'N/A';
+      if (value === null || value === undefined) return 'Unsampled';
+      return ENG.fmt(p, value) + (p.unit ? ' ' + p.unit : '');
+    };
+    const ex = ENG.exploration(r, null, {
+      paperCount: rid => G ? GRAPH.paperCount(G, rid) : 0
+    });
+    const objectiveDetails = {
+      rover: {
+        title: 'Rover mobility & traction',
+        detail: `Terrain: ${metric('morph')}; mean slope: ${metric('slope')}. Test wheel sinkage, traction, and autonomous hazard detection against measured terrain.`
+      },
+      drill: {
+        title: 'Cryogenic regolith & core drilling',
+        detail: `Lithology: ${metric('geo')}; water / ice indicator: ${metric('water')}. Evaluate core recovery and thermal performance; confirm subsurface conditions with direct sampling.`
+      },
+      suit: {
+        title: 'Spacesuit biomechanics & ingress',
+        detail: `Elevation: ${metric('elev')}; mean temperature: ${metric('temp')}; pressure: ${metric('pres')}. Track mobility, dexterity, and physiological load at the site.`
+      },
+      isru: {
+        title: 'In-situ resource utilization',
+        detail: `Water / ice indicator: ${metric('water')}; hydrological regime: ${metric('hydro')}. Validate feedstock with direct assays before treating it as an extractable resource.`
+      },
+      isolation: {
+        title: 'Crew isolation & communications',
+        detail: 'Plan habitat-duration, crew-wellbeing, and communications-loss drills. The site catalog does not model actual communications latency or infrastructure.'
+      },
+      bio: {
+        title: 'Life-detection & clean sampling',
+        detail: `Geology: ${metric('geo')}; hydrological regime: ${metric('hydro')}. Define blank controls and contamination-safe handling; this assessment does not assert that biosignatures are present.`
+      }
+    };
+    const selectedObjectives = checkedBoxes.map(id => objectiveDetails[id]).filter(Boolean);
+    const assessmentFactors = ex.items.map(item => `
+      <div class="assessment-factor">
+        <strong>${esc(item.c.name)}</strong>
+        <span>${item.v === null ? 'No data' : Math.round(item.v * 100) + '%'}</span>
+        <small>${esc(item.note)}</small>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px;font-size:0.76rem">
-    `;
+    `).join('');
+    const objectiveHtml = selectedObjectives.length
+      ? selectedObjectives.map(item => `
+          <div class="assessment-objective">
+            <strong>${esc(item.title)}</strong>
+            <p>${esc(item.detail)}</p>
+          </div>
+        `).join('')
+      : '<p class="site-context-muted">No objectives selected. Choose one or more objectives to add protocols to this assessment.</p>';
+    const reference = plannerReferenceId ? REG[plannerReferenceId] : null;
 
-    if (checkedBoxes.includes('rover')) {
-      planHtml += `
-        <div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:3px solid var(--accent-cyan)">
-          <strong style="color:var(--text-bright)">Rover Mobility & Obstacle Traverse:</strong><br>
-          Test wheel sinkage, grouser slip curves, and autonomous hazard-avoidance algorithms across ${r.v.morph === 'crater' ? 'steep crater wall rubble (up to 19°)' : 'salt crust and sandy regolith'}.
+    document.getElementById('plannerOutputArea').innerHTML = `
+      <div class="assessment-report">
+        <div class="assessment-heading">
+          <div>
+            <h4>Field Assessment</h4>
+            <p>${esc(r.name)}${reference ? ` · Earth analog for ${esc(reference.name)} (${esc(BODIES[reference.body].name)})` : ''}</p>
+          </div>
+          <div class="assessment-score">
+            <strong>${ex.score === null ? '—' : ex.score.toFixed(1)}</strong>
+            <span>Suitability / 100</span>
+          </div>
         </div>
-      `;
-    }
-    if (checkedBoxes.includes('drill')) {
-      planHtml += `
-        <div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:3px solid var(--accent-emerald)">
-          <strong style="color:var(--text-bright)">Core Drilling & Sample Transfer:</strong><br>
-          Validate drill bit thermal dissipation and core acquisition in ${r.v.geo.includes('basalt') ? 'dense tholeiitic basalt' : 'indurated sulfate evaporite blocks'}.
+        <div class="assessment-meta">
+          <span><strong>Evidence coverage</strong>${ex.supportedPct.toFixed(0)}%</span>
+          <span><strong>Coordinates</strong>${Math.abs(r.lat).toFixed(2)}° ${r.lat >= 0 ? 'N' : 'S'}, ${Math.abs(r.lon).toFixed(2)}° ${r.lon >= 0 ? 'E' : 'W'}</span>
+          <span><strong>Region</strong>${esc(r.country || BODIES[r.body].name)}</span>
         </div>
-      `;
-    }
-    if (checkedBoxes.includes('suit')) {
-      planHtml += `
-        <div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:3px solid var(--accent-amber)">
-          <strong style="color:var(--text-bright)">Spacesuit Bio-mechanics & Ingress:</strong><br>
-          Evaluate astronaut metabolic load, glove dexterity, and life-support power draw under ${r.v.elev > 3000 ? 'high-altitude hypobaric stress (Ladakh cold desert)' : 'extreme thermal swings'}.
-        </div>
-      `;
-    }
-    if (checkedBoxes.includes('isru')) {
-      planHtml += `
-        <div style="padding:10px;background:rgba(255,255,255,0.03);border-radius:6px;border-left:3px solid var(--accent-earth)">
-          <strong style="color:var(--text-bright)">In-Situ Resource Utilization (ISRU):</strong><br>
-          Test water extraction from hydrated minerals and permafrost gravels using thermal sublimation reactors.
-        </div>
-      `;
-    }
-    planHtml += `</div>`;
-    document.getElementById('plannerOutputArea').innerHTML = planHtml;
+        <h5>Suitability factors</h5>
+        <div class="assessment-factors">${assessmentFactors}</div>
+        <h5>Selected objective protocols (${selectedObjectives.length})</h5>
+        <div class="assessment-objectives">${objectiveHtml}</div>
+        <p class="assessment-caveat">Decision-support estimate based on catalogued data, not a safety clearance. Confirm site access, season, permits, weather, and hazards with local authorities before fieldwork.</p>
+      </div>
+    `;
   }
 
   /* ============================================================
