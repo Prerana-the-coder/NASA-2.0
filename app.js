@@ -608,27 +608,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     svgEl.innerHTML = svgContent;
 
-    // Node click handlers
     svgEl.querySelectorAll('.gnode').forEach(gn => {
-      gn.addEventListener('click', () => {
-        const nodeId = gn.dataset.node;
-        if (nodeId && G.nodes[nodeId] && G.nodes[nodeId].type === 'region') {
-          selectRegion(G.nodes[nodeId].region);
+      const selectNode = () => {
+        const node = G.nodes[gn.dataset.node];
+        if (!node) return;
+        const info = document.getElementById('miniGraphInfo');
+        if (info) info.textContent = `${node.label} · ${GRAPH.TYPE[node.type].label} · ${G.adj[node.id].length} connections`;
+        if (node.type === 'region') selectRegion(node.region);
+        else openGraphModal(node.id);
+      };
+      gn.addEventListener('click', selectNode);
+      gn.addEventListener('keydown', event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          selectNode();
         }
       });
     });
   }
 
   function renderGraphLegend() {
-    const legEl = document.getElementById('graphLegend');
-    if (!legEl) return;
-    legEl.innerHTML = `
-      <span class="graph-legend-item"><span class="graph-legend-dot" style="background:#4aa3ff"></span>Earth Locations</span>
-      <span class="graph-legend-item"><span class="graph-legend-dot" style="background:#ff8a50"></span>Mars Regions</span>
-      <span class="graph-legend-item"><span class="graph-legend-dot" style="background:#c9c3e6"></span>Moon Regions</span>
-      <span class="graph-legend-item"><span class="graph-legend-dot" style="background:#7aa7ff"></span>Missions</span>
-      <span class="graph-legend-item"><span class="graph-legend-dot" style="background:#7cf0b5"></span>Geological Features</span>
-    `;
+    const legend = Object.entries(GRAPH.TYPE).map(([type, details]) =>
+      `<span class="graph-legend-item" role="listitem"><span class="graph-legend-dot" style="background:${details.color}"></span>${details.label}</span>`
+    ).join('');
+    ['graphLegend', 'graphTypeLegend'].forEach(id => {
+      const element = document.getElementById(id);
+      if (element) element.innerHTML = legend;
+    });
   }
 
   /* ============================================================
@@ -1949,58 +1955,176 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('graphModal').style.display = 'none';
   });
 
-  function openGraphModal() {
+  let graphPositions = null;
+  let selectedGraphNode = null;
+  let selectedGraphEdge = null;
+  let graphSearchFrame = 0;
+
+  function openGraphModal(nodeId) {
     document.getElementById('graphModal').style.display = '';
+    selectedGraphNode = nodeId || (selRegion ? 'r:' + selRegion : 'r:atacama');
+    selectedGraphEdge = null;
+    if (!nodeId) {
+      document.getElementById('graphSearch').value = '';
+      document.getElementById('graphFilter').value = '';
+      document.getElementById('graphRelationFilter').value = '';
+    }
     renderFullGraph();
   }
 
   function renderFullGraph() {
     if (!G) return;
     const filterType = document.getElementById('graphFilter').value;
+    const filterRelation = document.getElementById('graphRelationFilter').value;
     const searchVal  = (document.getElementById('graphSearch').value || '').toLowerCase();
-
-    let nodeIds = Object.keys(G.nodes);
-    if (filterType) nodeIds = nodeIds.filter(id => G.nodes[id].type === filterType);
-    if (searchVal)  nodeIds = nodeIds.filter(id => G.nodes[id].label.toLowerCase().includes(searchVal));
-
-    const edges = G.edges.filter(e => nodeIds.includes(e.a) || nodeIds.includes(e.b));
-    edges.forEach(e => {
-      if (!nodeIds.includes(e.a)) nodeIds.push(e.a);
-      if (!nodeIds.includes(e.b)) nodeIds.push(e.b);
+    const nodeIds = Object.keys(G.nodes);
+    if (!graphPositions) graphPositions = GRAPH.layout(nodeIds, G.edges, 920, 480, 120);
+    const matchingNodes = nodeIds.filter(id => {
+      const node = G.nodes[id];
+      return (!filterType || node.type === filterType) && (!searchVal || node.label.toLowerCase().includes(searchVal));
     });
-
-    const positions = GRAPH.layout(nodeIds, edges, 920, 480, 240);
-    const svgInner = GRAPH.svg(G, positions, { focus: null, edges, query: searchVal, edgeSel: null });
+    const matchingEdges = G.edges.filter(edge =>
+      (!filterRelation || edge.type === filterRelation) &&
+      (!filterType || G.nodes[edge.a].type === filterType || G.nodes[edge.b].type === filterType) &&
+      (!searchVal || G.nodes[edge.a].label.toLowerCase().includes(searchVal) || G.nodes[edge.b].label.toLowerCase().includes(searchVal))
+    );
+    const summary = document.getElementById('graphSummary');
+    summary.textContent = `${matchingNodes.length} of ${nodeIds.length} nodes · ${matchingEdges.length} of ${G.edges.length} relationships`;
+    const svgInner = GRAPH.svg(G, graphPositions, {
+      focus: selectedGraphNode,
+      edges: G.edges,
+      query: searchVal,
+      filterType,
+      edgeType: filterRelation,
+      edgeSel: selectedGraphEdge
+    });
 
     const svgEl = document.getElementById('graphFullSVG');
     svgEl.innerHTML = svgInner;
-
-    svgEl.querySelectorAll('.gnode').forEach(gn => {
-      gn.addEventListener('click', () => {
-        const nid = gn.dataset.node;
-        const node = G.nodes[nid];
-        if (!node) return;
-
-        let info = `<strong>${node.label}</strong> (${GRAPH.TYPE[node.type].label})<br>`;
-        if (node.type === 'region' && REG[node.region]) {
-          info += `<span style="color:var(--text-muted)">${REG[node.region].desc}</span><br>`;
-        }
-        const neighbors = G.adj[nid] ? G.adj[nid].slice(0, 6) : [];
-        if (neighbors.length) {
-          info += `<br><strong>Connected Relationships:</strong><ul style="margin:4px 0 0 16px">`;
-          neighbors.forEach(nb => {
-            const other = nb.to === nid ? nb.e.a : nb.to;
-            info += `<li>${G.nodes[other] ? G.nodes[other].label : other} &bull; <em>${nb.e.type}</em></li>`;
-          });
-          info += `</ul>`;
-        }
-        document.getElementById('graphInfo').innerHTML = info;
-      });
-    });
+    if (selectedGraphEdge !== null) showGraphEdgeDetails(G.edges.find(edge => edge.i === selectedGraphEdge));
+    else if (selectedGraphNode) showGraphNodeDetails(selectedGraphNode);
   }
 
-  document.getElementById('graphSearch').addEventListener('input', renderFullGraph);
+  function showGraphNodeDetails(nodeId) {
+    const node = G.nodes[nodeId];
+    if (!node) return;
+    const panel = document.getElementById('graphInfo');
+    panel.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = `${node.label} · ${GRAPH.TYPE[node.type].label}`;
+    panel.appendChild(heading);
+    if (node.body) {
+      const body = document.createElement('span');
+      body.className = 'graph-info-meta';
+      body.textContent = `Planetary body: ${node.body}`;
+      panel.appendChild(body);
+    }
+    if (node.type === 'region' && REG[node.region]) {
+      const description = document.createElement('p');
+      description.textContent = REG[node.region].desc;
+      panel.appendChild(description);
+    }
+    const neighbors = G.adj[nodeId] || [];
+    const summary = document.createElement('span');
+    summary.className = 'graph-info-meta';
+    summary.textContent = `${neighbors.length} connected relationship${neighbors.length === 1 ? '' : 's'}`;
+    panel.appendChild(summary);
+    if (neighbors.length) {
+      const list = document.createElement('ul');
+      neighbors.slice(0, 6).forEach(({ to, e }) => {
+        const item = document.createElement('li');
+        const relation = document.createElement('button');
+        relation.type = 'button';
+        relation.className = 'graph-edge-link';
+        relation.textContent = `${G.nodes[to].label} · ${e.type}`;
+        relation.addEventListener('click', () => {
+          selectedGraphNode = null;
+          selectedGraphEdge = e.i;
+          renderFullGraph();
+        });
+        item.appendChild(relation);
+        list.appendChild(item);
+      });
+      panel.appendChild(list);
+    }
+  }
+
+  function showGraphEdgeDetails(edge) {
+    if (!edge) return;
+    const panel = document.getElementById('graphInfo');
+    panel.replaceChildren();
+    const heading = document.createElement('strong');
+    heading.textContent = `${G.nodes[edge.a].label} ↔ ${G.nodes[edge.b].label}`;
+    panel.appendChild(heading);
+    const endpoints = document.createElement('div');
+    endpoints.className = 'graph-endpoint-actions';
+    [edge.a, edge.b].forEach(nodeId => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'graph-edge-link';
+      button.textContent = `Focus ${G.nodes[nodeId].label}`;
+      button.addEventListener('click', () => {
+        selectedGraphEdge = null;
+        selectedGraphNode = nodeId;
+        renderFullGraph();
+      });
+      endpoints.appendChild(button);
+    });
+    panel.appendChild(endpoints);
+    const relation = document.createElement('span');
+    relation.className = 'graph-info-meta';
+    relation.textContent = `${edge.type} · ${edge.status || 'catalogued'}`;
+    panel.appendChild(relation);
+    if (edge.expl) {
+      const explanation = document.createElement('p');
+      explanation.textContent = edge.expl;
+      panel.appendChild(explanation);
+    }
+    if (edge.ref) {
+      const reference = document.createElement('span');
+      reference.className = 'graph-info-meta';
+      reference.textContent = `Reference: ${edge.ref}`;
+      panel.appendChild(reference);
+    }
+  }
+
+  const graphSearch = document.getElementById('graphSearch');
+  graphSearch.addEventListener('input', () => {
+    cancelAnimationFrame(graphSearchFrame);
+    graphSearchFrame = requestAnimationFrame(renderFullGraph);
+  });
   document.getElementById('graphFilter').addEventListener('change', renderFullGraph);
+  document.getElementById('graphRelationFilter').addEventListener('change', renderFullGraph);
+  document.getElementById('graphResetBtn').addEventListener('click', () => {
+    graphSearch.value = '';
+    document.getElementById('graphFilter').value = '';
+    document.getElementById('graphRelationFilter').value = '';
+    selectedGraphNode = selRegion ? 'r:' + selRegion : 'r:atacama';
+    selectedGraphEdge = null;
+    renderFullGraph();
+  });
+
+  const graphFullSVG = document.getElementById('graphFullSVG');
+  graphFullSVG.addEventListener('click', event => {
+    const target = event.target instanceof Element ? event.target.closest('.gnode, .gedge') : null;
+    if (!target) return;
+    if (target.classList.contains('gnode')) {
+      selectedGraphNode = target.dataset.node;
+      selectedGraphEdge = null;
+      renderFullGraph();
+    } else {
+      selectedGraphEdge = Number(target.dataset.edge);
+      selectedGraphNode = null;
+      renderFullGraph();
+    }
+  });
+  graphFullSVG.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target instanceof Element ? event.target.closest('.gnode, .gedge') : null;
+    if (!target) return;
+    event.preventDefault();
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
 
   /* ============================================================
      3D FLOATING GLOBE LABELS (PROJECT 3D TO SCREEN 2D)

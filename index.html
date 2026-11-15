@@ -6,7 +6,7 @@
 <title>NASA — Planetary Analog Intelligence</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%230a1428'/><text x='16' y='22' text-anchor='middle' fill='%2338d8ff' font-size='16' font-family='Arial'>☉</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=20261115-assessment">
+<link rel="stylesheet" href="style.css?v=20261115-network-v3">
 </head>
 <body>
 
@@ -339,8 +339,9 @@
         </div>
 
         <div class="knowledge-content">
-          <svg id="knowledgeSVG" viewBox="0 0 460 210" preserveAspectRatio="xMidYMid meet"></svg>
+          <svg id="knowledgeSVG" viewBox="0 0 460 210" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Interactive preview of the inter-planetary knowledge network"></svg>
           <div class="graph-legend" id="graphLegend"></div>
+          <p class="mini-graph-info" id="miniGraphInfo" aria-live="polite">Select a node to explore its connections.</p>
         </div>
       </div>
 
@@ -626,22 +627,39 @@
       <div class="graph-modal-header">
         <div>
           <h3>🌐 Inter-Planetary Knowledge Network</h3>
-          <p class="modal-sub">Interactive topological graph connecting regions, orbiters, rovers, in-situ instruments, observations, and literature.</p>
+          <p class="modal-sub">Explore catalogued and computed links across planetary regions, missions, instruments, observations, and literature.</p>
         </div>
         <div class="graph-controls-row">
-          <input type="text" id="graphSearch" placeholder="Filter nodes (e.g., Lonar, M³, Gale)..." class="styled-input">
-          <select id="graphFilter" class="styled-select">
+          <input type="search" id="graphSearch" placeholder="Search nodes (e.g., Lonar, M³, Gale)..." class="styled-input" aria-label="Search network nodes">
+          <select id="graphFilter" class="styled-select" aria-label="Filter by node type">
             <option value="">All Node Types</option>
             <option value="region">Regions</option>
             <option value="mission">Missions</option>
             <option value="instrument">Instruments</option>
             <option value="observation">Observations</option>
             <option value="paper">Scientific Papers</option>
+            <option value="formation">Geological Features</option>
+            <option value="dataset">Datasets</option>
           </select>
+          <select id="graphRelationFilter" class="styled-select" aria-label="Filter by relationship">
+            <option value="">All Relationships</option>
+            <option value="proposed analog">Proposed analogs</option>
+            <option value="computed analog">Computed analogs</option>
+            <option value="explored by">Explored by</option>
+            <option value="carries">Mission instruments</option>
+            <option value="produced">Instrument output</option>
+            <option value="covers">Dataset coverage</option>
+          </select>
+          <button type="button" class="btn-outline graph-reset-btn" id="graphResetBtn">Reset</button>
         </div>
       </div>
-      <svg id="graphFullSVG" viewBox="0 0 920 480" preserveAspectRatio="xMidYMid meet"></svg>
-      <div id="graphInfo" class="graph-info-panel">Click any node or connection edge in the network to inspect scientific metadata.</div>
+      <div class="graph-summary-row">
+        <span id="graphSummary" aria-live="polite">Preparing network…</span>
+        <span class="graph-evidence-key"><i class="graph-key-dot key-curated"></i>Catalogued link <i class="graph-key-dot key-hypothesis"></i>Proposed analog <i class="graph-key-line"></i>Computed analog</span>
+      </div>
+      <div id="graphTypeLegend" class="graph-legend graph-type-legend" role="list" aria-label="Network node types"></div>
+      <svg id="graphFullSVG" viewBox="0 0 920 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Interactive inter-planetary knowledge network"></svg>
+      <div id="graphInfo" class="graph-info-panel" aria-live="polite">Select a node or relationship to inspect its scientific context.</div>
     </div>
   </div>
 
@@ -653,8 +671,8 @@
 <!-- Engine & Platform Core -->
 <script src="data.js?v=20261115"></script>
 <script src="engine.js?v=20261114"></script>
-<script src="graph.js?v=20261114"></script>
+<script src="graph.js?v=20261115-network-v3"></script>
 <script src="globe.js?v=20261114"></script>
-<script src="app.js?v=20261115-assessment"></script>
+<script src="app.js?v=20261115-network-v3"></script>
 </body>
 </html>

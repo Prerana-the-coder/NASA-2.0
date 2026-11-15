@@ -1244,7 +1244,43 @@ body {
 #knowledgeSVG {
   width: 100%;
   height: 145px;
+  overflow: visible;
 }
+
+#knowledgeSVG .gnode,
+#graphFullSVG .gnode,
+#graphFullSVG .gedge {
+  cursor: pointer;
+  transition: opacity 0.18s ease;
+}
+
+#knowledgeSVG .gnode:focus,
+#graphFullSVG .gnode:focus,
+#graphFullSVG .gedge:focus {
+  outline: none;
+  filter: drop-shadow(0 0 5px rgba(56, 216, 255, 0.9));
+}
+
+#knowledgeSVG .gnode:hover,
+#graphFullSVG .gnode:hover {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.85));
+}
+
+#knowledgeSVG .glabel,
+#graphFullSVG .glabel {
+  fill: var(--text-main);
+  font: 9px Inter, sans-serif;
+  paint-order: stroke;
+  stroke: rgba(6, 10, 20, 0.9);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.gedge-hit { pointer-events: stroke; }
+.gedge:hover line:first-child,
+.gedge:focus line:first-child,
+.gedge.is-selected line:first-child { stroke-width: 3px; }
 
 .graph-legend {
   display: flex;
@@ -1265,6 +1301,14 @@ body {
   width: 7px;
   height: 7px;
   border-radius: 50%;
+}
+
+.mini-graph-info {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.4;
+  min-height: 1em;
 }
 
 /* Missions List Preview */
@@ -2320,8 +2364,58 @@ body {
 
 .graph-controls-row {
   display: flex;
+  flex: 1 1 580px;
   gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
+
+.graph-controls-row .styled-input,
+.graph-controls-row .styled-select {
+  flex: 1 1 155px;
+  min-width: 130px;
+}
+
+.graph-reset-btn {
+  flex: 0 0 auto;
+}
+
+.graph-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 2px 8px;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.graph-evidence-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.graph-key-dot,
+.graph-key-line {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.key-curated { background: #4a7bc0; }
+.key-hypothesis { background: var(--accent-amber); }
+.graph-key-line {
+  width: 14px;
+  height: 2px;
+  border-radius: 0;
+  background: var(--accent-emerald);
+}
+
+.graph-type-legend { margin: 0 2px 8px; }
 
 #graphFullSVG {
   width: 100%;
@@ -2329,6 +2423,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: rgba(6, 12, 24, 0.6);
+  touch-action: manipulation;
 }
 
 .graph-info-panel {
@@ -2338,6 +2433,37 @@ body {
   border-radius: var(--radius-sm);
   font-size: 0.78rem;
   line-height: 1.6;
+}
+
+.graph-info-panel strong,
+.graph-info-panel .graph-info-meta {
+  display: block;
+}
+
+.graph-info-panel p { margin-top: 5px; }
+.graph-info-panel ul { margin: 5px 0 0 18px; }
+.graph-info-panel .graph-info-meta {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.graph-edge-link {
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--accent-cyan);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.graph-edge-link:hover,
+.graph-edge-link:focus-visible { text-decoration: underline; }
+
+.graph-endpoint-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 /* ============================================================
@@ -2721,4 +2847,12 @@ body {
   .nav-tabs { display: none; }
   .explore-search-grid { grid-template-columns: 1fr; }
   .planner-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 680px) {
+  .modal-graph { padding: 18px; }
+  .graph-controls-row { flex-basis: 100%; }
+  .graph-controls-row .styled-input,
+  .graph-controls-row .styled-select { flex-basis: 100%; }
+  #graphFullSVG { height: 340px; }
 }

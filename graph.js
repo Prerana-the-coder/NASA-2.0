@@ -73,15 +73,20 @@ const GRAPH = (() => {
   }
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   function svg(g, P, st) {
-    const hl = st.focus, nb = hl ? new Set(g.adj[hl].map(x => x.to).concat([hl])) : null, q = (st.query || '').toLowerCase();
+    const hl = st.focus && g.adj[st.focus] ? st.focus : null, nb = hl ? new Set(g.adj[hl].map(x => x.to).concat([hl])) : null, q = (st.query || '').toLowerCase();
     let out = '';
     st.edges.forEach(e => { const a = P[e.a], b = P[e.b]; if (!a || !b) return; const on = hl && (e.a === hl || e.b === hl), sel = st.edgeSel === e.i;
+      const relationMatch = !st.edgeType || e.type === st.edgeType;
+      const queryMatch = !q || g.nodes[e.a].label.toLowerCase().includes(q) || g.nodes[e.b].label.toLowerCase().includes(q);
+      const typeMatch = !st.filterType || g.nodes[e.a].type === st.filterType || g.nodes[e.b].type === st.filterType;
+      const dim = !relationMatch || !queryMatch || !typeMatch || (hl && !on);
       const col = e.status === 'computed' ? '#7cf0b5' : e.status === 'hypothesis' ? '#ffd166' : '#4a7bc0';
-      out += `<line data-edge="${e.i}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${col}" stroke-width="${sel ? 3 : on ? 2 : 1}" stroke-opacity="${hl ? (on ? .95 : .12) : .5}" ${e.status === 'hypothesis' ? 'stroke-dasharray="5 4"' : ''}/>`;
-      out += `<line data-edge="${e.i}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="transparent" stroke-width="9"/>`; });
-    Object.keys(P).forEach(id => { const n = g.nodes[id], p = P[id], t = TYPE[n.type], dim = (hl && !nb.has(id)) || (q && !(n.label.toLowerCase().includes(q))); const r = n.type === 'region' ? 9 : n.type === 'mission' ? 8 : 6.5;
+      out += `<g class="gedge${sel ? ' is-selected' : ''}" data-edge="${e.i}" tabindex="0" role="button" aria-label="${esc(g.nodes[e.a].label)} to ${esc(g.nodes[e.b].label)}: ${esc(e.type)}" opacity="${dim ? .1 : 1}">`;
+      out += `<line x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${col}" stroke-width="${sel ? 3 : on ? 2 : 1}" stroke-opacity="${on ? .95 : .5}" ${e.status === 'hypothesis' ? 'stroke-dasharray="5 4"' : ''}/>`;
+      out += `<line class="gedge-hit" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="#fff" stroke-opacity=".01" stroke-width="14" pointer-events="stroke"/></g>`; });
+    Object.keys(P).forEach(id => { const n = g.nodes[id], p = P[id], t = TYPE[n.type], dim = (hl && !nb.has(id)) || (q && !(n.label.toLowerCase().includes(q))) || (st.filterType && n.type !== st.filterType); const r = n.type === 'region' ? 9 : n.type === 'mission' ? 8 : 6.5;
       const hit = q && n.label.toLowerCase().includes(q);
-      out += `<g class="gnode" data-node="${esc(id)}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})" opacity="${dim ? .22 : 1}" tabindex="0" role="button" aria-label="${esc(n.label)} (${t.label})">`;
+      out += `<g class="gnode${id === hl ? ' is-selected' : ''}" data-node="${esc(id)}" transform="translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})" opacity="${dim ? .22 : 1}" tabindex="0" role="button" aria-pressed="${id === hl}" aria-label="${esc(n.label)} (${t.label})">`;
       if (id === hl || hit) out += `<circle r="${r + 6}" fill="none" stroke="#fff" stroke-width="1.5" stroke-opacity=".8"/>`;
       out += `<circle r="${r}" fill="${t.color}" fill-opacity=".92" stroke="${n.body ? BODY_COL[n.body] : '#0a1428'}" stroke-width="2"/>`;
       out += `<text y="${r + 11}" text-anchor="middle" class="glabel">${esc(n.label.length > 26 ? n.label.slice(0, 25) + '…' : n.label)}</text></g>`; });
